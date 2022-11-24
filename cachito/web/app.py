@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import logging
 import os
+from pathlib import Path
 from timeit import default_timer as timer
 
+import connexion
 import pydantic
-from flask import Flask, current_app
+from flask import current_app
 from flask.logging import default_handler
 from flask_login import LoginManager
 from flask_migrate import Migrate
@@ -80,7 +82,9 @@ def create_app(config_obj=None):
     :return: a Flask application object
     :rtype: flask.Flask
     """
-    app = Flask(__name__)
+    connexion_app = connexion.FlaskApp(__name__)
+    app = connexion_app.app
+
     if config_obj:
         app.config.from_object(config_obj)
     else:
@@ -110,6 +114,10 @@ def create_app(config_obj=None):
 
     app.register_blueprint(docs)
     app.register_blueprint(api_v1, url_prefix="/api/v1")
+
+    path = Path(__file__).parents[1].absolute()
+    connexion_app.add_api(f"{path}/web/static/api_v1.yaml")
+
     app.add_url_rule("/healthcheck", view_func=healthcheck)
 
     for code in default_exceptions.keys():
