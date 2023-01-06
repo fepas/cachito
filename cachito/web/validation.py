@@ -2,6 +2,9 @@
 
 from typing import Any, Dict, List
 
+import jsonschema
+from connexion import decorators
+
 from cachito.errors import ValidationError
 
 
@@ -46,3 +49,27 @@ def validate_dependency_replacements(replacements: List[Dict[str, Any]]) -> None
         raise ValidationError('"dependency_replacements" must be an array')
     for replacement in replacements:
         validate_replacement(replacement)
+
+
+class RequestBodyValidator(decorators.validation.RequestBodyValidator):
+    """
+    This class overrides the default connexion RequestBodyValidator.
+
+    It returns the complete string representation of the
+    error, rather than just returning the error message.
+
+    For more information:
+        - https://github.com/zalando/connexion/issues/558
+        - https://connexion.readthedocs.io/en/latest/request.html
+    """
+
+    def validate_schema(self, data, url):
+        """Throw cachito.ValidationError."""
+        if self.is_null_value_valid and jsonschema.is_null(data):
+            return None
+        try:
+            self.validator.validate(data)
+        except jsonschema.ValidationError as exception:
+            raise ValidationError(exception.message)
+
+        return None
