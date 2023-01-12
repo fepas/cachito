@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import functools
 from typing import Any, Dict, List
 
 import jsonschema
 from connexion import decorators
 
 from cachito.errors import ValidationError
+from connexion.exceptions import BadRequestProblem, ExtraParameterProblem
 
 
 def validate_replacement(replacement: Dict[str, Any]) -> None:
@@ -69,7 +71,33 @@ class RequestBodyValidator(decorators.validation.RequestBodyValidator):
             return None
         try:
             self.validator.validate(data)
-        except jsonschema.ValidationError as exception:
+        except Exception as exception:
             raise ValidationError(exception.message)
 
         return None
+
+
+class ParameterValidator(decorators.validation.ParameterValidator):
+    """
+    This class overrides the default connexion ParameterValidator.
+
+    It returns the complete string representation of the
+    error, rather than just returning the error message.
+
+    For more information:
+        - https://github.com/zalando/connexion/issues/558
+        - https://connexion.readthedocs.io/en/latest/request.html
+    """
+
+    def __call__(self, function):
+        """Throw cachito.ValidationError."""
+        wrapper = super().__call__(function)
+
+        def handle_wrapper(request):
+            """Handle original wrapper."""
+            try:
+                wrapper(request)
+            except Exception as e:
+                raise ValidationError(e.detail) 
+        
+        return handle_wrapper
